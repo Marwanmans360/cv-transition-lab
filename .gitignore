@@ -253,5 +253,9 @@ mlruns/
 *.jpeg
 *.webp
 
-# If you DO want to keep sample images, comment the image lines above
+# …but keep demo images
+!demos/**/*.png
+!demos/**/*.jpg
+!demos/**/*.jpeg
+!demos/**/*.webp
 
