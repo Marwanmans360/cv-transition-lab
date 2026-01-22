@@ -1,0 +1,36 @@
+{
+    "l2_ridge": {
+        "best_learning_rate": 0.001,
+        "best_lambda": 5.0,
+        "cv_accuracy": 0.3661,
+        "test_accuracy": 0.3648,
+        "sparsity_percent": 0.05859375,
+        "weight_shape": [
+            3073,
+            10
+        ]
+    },
+    "l1_lasso": {
+        "best_learning_rate": 0.001,
+        "best_lambda": 0.1,
+        "cv_accuracy": 0.214,
+        "test_accuracy": 0.2149,
+        "sparsity_percent": 0.9570312500000001,
+        "weight_shape": [
+            3073,
+            10
+        ]
+    },
+    "elastic_net": {
+        "best_learning_rate": 0.001,
+        "best_lambda": 0.1,
+        "alpha": 0.5,
+        "cv_accuracy": 0.2767,
+        "test_accuracy": 0.2691,
+        "sparsity_percent": 1.435546875,
+        "weight_shape": [
+            3073,
+            10
+        ]
+    }
+}
