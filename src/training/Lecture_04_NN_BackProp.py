@@ -10,8 +10,8 @@ import time
 # Your project root folder that contains src/...
 PROJECT_ROOT = r"/path/to/cv-transition-lab"  # e.g. "/home/ubuntu/cv-transition-lab"
 # CIFAR-10 python batches folder containing data_batch_1..5, test_batch
-CIFAR_PATH = r"/path/to/cifar-10-batches-py"  # e.g. "/home/ubuntu/data/cifar-10-batches-py"
-
+# CIFAR_PATH = r"/path/to/cifar-10-batches-py"  # e.g. "/home/ubuntu/data/cifar-10-batches-py"
+CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
 # Add project root to Python path so imports work
 sys.path.append(PROJECT_ROOT)
 
