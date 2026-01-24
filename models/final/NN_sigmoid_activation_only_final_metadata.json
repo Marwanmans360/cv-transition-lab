@@ -1,0 +1,11 @@
+{
+  "activation": "sigmoid",
+  "mode": "activation_only",
+  "seed": 42,
+  "H": 200,
+  "reg": 0.001,
+  "final_cv_accuracy": 0.3304,
+  "D": 3072,
+  "C": 10,
+  "status": "final weights after all iterations"
+}
