@@ -17,8 +17,8 @@ plt.ion()
 # Your project root folder that contains src/...
 PROJECT_ROOT = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab"
 # CIFAR-10 python batches folder containing data_batch_1..5, test_batch
-CIFAR_PATH = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab\data\cifar-10-batches-py\\"
-# CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
+# CIFAR_PATH = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab\data\cifar-10-batches-py\\"
+CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
 
 # Add project root to Python path so imports work
 sys.path.insert(0, PROJECT_ROOT)
