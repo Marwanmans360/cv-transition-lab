@@ -3,17 +3,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
+import os
+import json
+
+from sympy import N
+
+# Make matplotlib non-blocking (don't block on show)
+plt.ion()
 
 # ============================================================
 # 0) PATHS (EDIT THESE FOR YOUR VM)
 # ============================================================
 # Your project root folder that contains src/...
-PROJECT_ROOT = r"/path/to/cv-transition-lab"  # e.g. "/home/ubuntu/cv-transition-lab"
+PROJECT_ROOT = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab"
 # CIFAR-10 python batches folder containing data_batch_1..5, test_batch
-# CIFAR_PATH = r"/path/to/cifar-10-batches-py"  # e.g. "/home/ubuntu/data/cifar-10-batches-py"
-CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
+CIFAR_PATH = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab\data\cifar-10-batches-py\\"
+# CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
+
 # Add project root to Python path so imports work
-sys.path.append(PROJECT_ROOT)
+sys.path.insert(0, PROJECT_ROOT)
 
 # Your loader (as you already have)
 from src.data.CIFAR10_Load_Test_and_Train_Data import load_cifar10
@@ -21,7 +29,11 @@ from src.data.CIFAR10_Load_Test_and_Train_Data import load_cifar10
 # ============================================================
 # 1) LOAD DATA
 # ============================================================
+print("[LOADING DATA...]", flush=True)
+sys.stdout.flush()
 (X_train, y_train), (X_test, y_test) = load_cifar10(CIFAR_PATH)
+print("[DATA LOADED]", flush=True)
+sys.stdout.flush()
 
 # Flatten if needed (if loader returns N x 32 x 32 x 3)
 if X_train.ndim == 4:
@@ -31,6 +43,8 @@ if X_train.ndim == 4:
 print("Raw shapes:")
 print("Train:", X_train.shape, y_train.shape)
 print("Test :", X_test.shape, y_test.shape)
+print("[SPLIT DATA...]", flush=True)
+sys.stdout.flush()
 
 # ============================================================
 # 2) TRAIN / CV SPLIT
@@ -89,6 +103,8 @@ X_test /= std_img
 
 print("\nAfter preprocessing:")
 print(f"Train min={X_tr.min():.3f}, max={X_tr.max():.3f}, mean={X_tr.mean():.3f}, std={X_tr.std():.3f}")
+print("[PREPROCESSING COMPLETE - STARTING TRAINING...]", flush=True)
+sys.stdout.flush()
 
 # ============================================================
 # 5) CORE LAYERS: AFFINE, ACTIVATIONS, SOFTMAX LOSS
@@ -279,17 +295,32 @@ def train_full_batch(
     lr_decay=0.9,
     num_iters=300,
     decay_every=100,
-    log_every=50
+    log_every=50,
+    activation="relu",
+    mode="activation_only",
+    seed=42,
+    H=200,
+    reg=1e-3,
+    checkpoint_every=100,
+    models_dir="models"
 ):
     """
     Full-batch GD: each iteration uses ALL training data.
+    Saves checkpoint weights every checkpoint_every iterations.
+    
     Returns:
       - history: for plotting (loss, logged cv_acc points)
       - final_cv_acc: CV accuracy AFTER all iterations
     """
     history = {"loss": [], "iters": [], "cv_acc": []}
+    print(f"  [Starting {num_iters} iterations...]", flush=True)
+    sys.stdout.flush()
 
     for it in range(1, num_iters + 1):
+        if it == 1:
+            print(f"  [Iter 1: Computing forward/backward...]", flush=True)
+            sys.stdout.flush()
+        
         t0 = time.time()
 
         loss, grads = net.loss_and_grads(X_tr, y_tr)
@@ -297,14 +328,52 @@ def train_full_batch(
             net.params[k] -= lr * grads[k]
 
         history["loss"].append(loss)
+        dt = time.time() - t0
 
         # Log occasionally (doesn't affect training)
         if it == 1 or it % log_every == 0 or it == num_iters:
+            if it == 1:
+                print(f"  [Iter 1: Computing CV accuracy...]", flush=True)
+                sys.stdout.flush()
+            
             cv_acc = np.mean(net.predict(X_cv) == y_cv)
             history["iters"].append(it)
             history["cv_acc"].append(cv_acc)
-            dt = time.time() - t0
-            print(f"[{net.activation:10s}] iter {it:04d}/{num_iters} | loss={loss:.4f} | cv_acc={cv_acc:.4f} | lr={lr:.5f} | step={dt:.3f}s")
+            msg = f"[{net.activation:10s}] iter {it:04d}/{num_iters} | loss={loss:.4f} | cv_acc={cv_acc:.4f} | lr={lr:.5f} | step={dt:.3f}s"
+            print(msg, flush=True)
+            sys.stdout.flush()
+        
+        # Save checkpoint every checkpoint_every iterations
+        if it % checkpoint_every == 0:
+            checkpoint_dir = os.path.join(models_dir, "checkpoints", f"{activation}_{mode}")
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            
+            checkpoint_file = os.path.join(checkpoint_dir, f"weights_iter_{it:04d}.npz")
+            np.savez(
+                checkpoint_file,
+                W1=net.params["W1"],
+                b1=net.params["b1"],
+                W2=net.params["W2"],
+                b2=net.params["b2"]
+            )
+            
+            # Save checkpoint metadata
+            checkpoint_meta = {
+                "activation": activation,
+                "mode": mode,
+                "iteration": it,
+                "loss": float(loss),
+                "cv_accuracy": float(cv_acc) if it == 1 or it % log_every == 0 or it == num_iters else None,
+                "seed": seed,
+                "H": H,
+                "reg": reg
+            }
+            
+            meta_file = os.path.join(checkpoint_dir, f"meta_iter_{it:04d}.json")
+            with open(meta_file, "w") as f:
+                json.dump(checkpoint_meta, f, indent=2)
+            
+            print(f"    ✓ Checkpoint saved: iter {it} -> {checkpoint_file}")
 
         # Step LR schedule (optional)
         if it % decay_every == 0:
@@ -316,6 +385,93 @@ def train_full_batch(
 # ============================================================
 # 8) EXPERIMENT RUNNER: TWO MODES
 # ============================================================
+
+def save_weights(net, activation, mode, seed, H, reg, final_cv, models_dir="models"):
+    """
+    Save final trained weights and metadata to models_dir/final/
+    
+    Files saved:
+      - NN_<activation>_<mode>_final_weights.npz (W1, b1, W2, b2)
+      - NN_<activation>_<mode>_final_metadata.json (config, cv_acc, etc)
+    """
+    final_dir = os.path.join(models_dir, "final")
+    os.makedirs(final_dir, exist_ok=True)
+    
+    # Filename
+    fname_weights = f"NN_{activation}_{mode}_final_weights.npz"
+    fname_meta = f"NN_{activation}_{mode}_final_metadata.json"
+    
+    path_weights = os.path.join(final_dir, fname_weights)
+    path_meta = os.path.join(final_dir, fname_meta)
+    
+    # Save weights
+    np.savez(
+        path_weights,
+        W1=net.params["W1"],
+        b1=net.params["b1"],
+        W2=net.params["W2"],
+        b2=net.params["b2"]
+    )
+    
+    # Save metadata
+    metadata = {
+        "activation": activation,
+        "mode": mode,
+        "seed": seed,
+        "H": H,
+        "reg": reg,
+        "final_cv_accuracy": float(final_cv),
+        "D": net.params["W1"].shape[0],
+        "C": net.params["W2"].shape[1],
+        "status": "final weights after all iterations"
+    }
+    
+    with open(path_meta, "w") as f:
+        json.dump(metadata, f, indent=2)
+    
+    print(f"    ✓ Final weights saved: {path_weights}")
+    print(f"    ✓ Final metadata saved: {path_meta}")
+    
+    return path_weights, path_meta
+
+def load_weights(activation, mode, models_dir="models"):
+    """
+    Load previously saved weights for an activation function.
+    
+    Returns:
+      - params dict: {"W1": ..., "b1": ..., "W2": ..., "b2": ...}
+      - metadata dict
+    """
+    fname_weights = f"NN_{activation}_{mode}_weights.npz"
+    fname_meta = f"NN_{activation}_{mode}_metadata.json"
+    
+    path_weights = os.path.join(models_dir, fname_weights)
+    path_meta = os.path.join(models_dir, fname_meta)
+    
+    if not os.path.exists(path_weights):
+        print(f"  ✗ Weights file not found: {path_weights}")
+        return None, None
+    
+    # Load weights
+    npz = np.load(path_weights)
+    params = {
+        "W1": npz["W1"],
+        "b1": npz["b1"],
+        "W2": npz["W2"],
+        "b2": npz["b2"]
+    }
+    
+    # Load metadata
+    metadata = {}
+    if os.path.exists(path_meta):
+        with open(path_meta, "r") as f:
+            metadata = json.load(f)
+    
+    print(f"    ✓ Loaded weights: {path_weights}")
+    if metadata:
+        print(f"    ✓ CV accuracy from file: {metadata.get('final_cv_accuracy', 'N/A'):.4f}")
+    
+    return params, metadata
 
 def make_shared_initial_params(D, H, C, init="small", seed=42):
     """
@@ -383,10 +539,26 @@ def run_all_activations(
             lr_decay=lr_decay,
             num_iters=num_iters,
             decay_every=decay_every,
-            log_every=log_every
+            log_every=log_every,
+            activation=act,
+            mode=mode,
+            seed=seed,
+            H=H,
+            reg=reg,
+            checkpoint_every=100
         )
 
-        results[act] = {"final_cv": final_cv, "history": history, "init_used": init_used}
+        # Save weights for this activation
+        print(f"  Saving weights for activation '{act}'...")
+        weights_path, meta_path = save_weights(net, act, mode, seed, H, reg, final_cv)
+        
+        results[act] = {
+            "final_cv": final_cv,
+            "history": history,
+            "init_used": init_used,
+            "weights_path": weights_path,
+            "metadata_path": meta_path
+        }
         print(f"--> FINAL CV accuracy for {act}: {final_cv:.4f}")
 
     # Summary sorted by FINAL CV
@@ -464,3 +636,6 @@ results_best_practice = run_all_activations(
     mode="best_practice",
     plot=True
 )
+
+print("\n\n======================== TRAINING COMPLETE ========================")
+print("Weights saved in models/ directory for each activation function.")
