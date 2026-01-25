@@ -18,9 +18,9 @@ print(f"GPU Available: {tf.config.list_physical_devices('GPU')}")
 # Your project root folder that contains src/...
 PROJECT_ROOT = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab"
 # CIFAR-10 python batches folder
-CIFAR_PATH = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab\data\cifar-10-batches-py"
+# CIFAR_PATH = r"C:\Users\user\OneDrive - TechnoVal\Desktop\Scripts\ML\cv-transition-lab\data\cifar-10-batches-py"
 # For Google Colab (uncomment if using Colab):
-# CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
+CIFAR_PATH = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
 
 # Add project root to Python path
 sys.path.insert(0, PROJECT_ROOT)
