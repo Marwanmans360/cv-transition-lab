@@ -674,60 +674,56 @@ if __name__ == "__main__":
     print("\n\n" + "="*80)
     print("STARTING DEEP NETWORK EXPERIMENTS WITH GRADIENT TRACKING")
     print("="*80 + "\n")
-    
+
     # Experiment 1: 3-layer network WITHOUT batch norm
-    # print("\n" + "#"*80)
-    # print("EXPERIMENT 1: 3-Layer Network (No Batch Norm)")
-    # print("This will show gradient vanishing in sigmoid/tanh!")
-    # print("#"*80)
-    
-    # results_3layer = compare_activations_deep(
-    #     X_tr, y_tr, X_cv, y_cv,
-    #     activations=['relu', 'gelu', 'tanh', 'sigmoid'],
-    #     architecture='3layer',
-    #     use_batch_norm=False,
-    #     epochs=30,
-    #     batch_size=128,
-    #     learning_rate=0.001,
-    #     save_dir='models_tf_deep'
-    # )
-    
+    print("\n" + "#"*80)
+    print("EXPERIMENT 1: 3-Layer Network (No Batch Norm)")
+    print("This will show gradient vanishing in sigmoid/tanh!")
+    print("#"*80)
+
+    results_3layer = compare_activations_deep(
+        X_tr, y_tr, X_cv, y_cv,
+        activations=['relu', 'gelu', 'tanh', 'sigmoid'],
+        architecture='3layer',
+        use_batch_norm=False,
+        epochs=100,  # Updated to 100 epochs
+        batch_size=128,
+        learning_rate=0.001,
+        save_dir='models_tf_deep'
+    )
+
     # Experiment 2: 4-layer network WITHOUT batch norm
-    # (Optional - uncomment to see gradient problems worsen)
-    
-    # print("\n" + "#"*80)
-    # print("EXPERIMENT 2: 4-Layer Network (No Batch Norm)")
-    # print("Gradient problems will be EVEN MORE SEVERE!")
-    # print("#"*80)
-    
-    # results_4layer = compare_activations_deep(
-    #     X_tr, y_tr, X_cv, y_cv,
-    #     activations=['relu', 'gelu', 'tanh', 'sigmoid'],
-    #     architecture='4layer',
-    #     use_batch_norm=False,
-    #     epochs=30,
-    #     batch_size=128,
-    #     learning_rate=0.001,
-    #     save_dir='models_tf_deep'
-    # )
-    
-    
+    print("\n" + "#"*80)
+    print("EXPERIMENT 2: 4-Layer Network (No Batch Norm)")
+    print("Gradient problems will be EVEN MORE SEVERE!")
+    print("#"*80)
+
+    results_4layer = compare_activations_deep(
+        X_tr, y_tr, X_cv, y_cv,
+        activations=['relu', 'gelu', 'tanh', 'sigmoid'],
+        architecture='4layer',
+        use_batch_norm=False,
+        epochs=100,  # Updated to 100 epochs
+        batch_size=128,
+        learning_rate=0.001,
+        save_dir='models_tf_deep'
+    )
+
     # Experiment 3: 3-layer WITH batch norm
-    # (Save this for AFTER you learn about batch normalization!)
     print("\n" + "#"*80)
     print("EXPERIMENT 3: 3-Layer Network (WITH Batch Norm)")
     print("Watch the gradient vanishing DISAPPEAR!")
     print("#"*80)
-    
+
     results_3layer_bn = compare_activations_deep(
         X_tr, y_tr, X_cv, y_cv,
         activations=['relu', 'gelu', 'tanh', 'sigmoid'],
         architecture='3layer',
         use_batch_norm=True,  # THE MAGIC SWITCH!
-        epochs=30,
+        epochs=300,  # Updated to 300 epochs
         batch_size=128
     )
-    
+
     print("\n\n" + "="*80)
     print("ALL EXPERIMENTS COMPLETE!")
     print("Check the models_tf_deep/ folder for:")
