@@ -695,26 +695,25 @@ if __name__ == "__main__":
     # Experiment 2: 4-layer network WITHOUT batch norm
     # (Optional - uncomment to see gradient problems worsen)
     
-    print("\n" + "#"*80)
-    print("EXPERIMENT 2: 4-Layer Network (No Batch Norm)")
-    print("Gradient problems will be EVEN MORE SEVERE!")
-    print("#"*80)
+    # print("\n" + "#"*80)
+    # print("EXPERIMENT 2: 4-Layer Network (No Batch Norm)")
+    # print("Gradient problems will be EVEN MORE SEVERE!")
+    # print("#"*80)
     
-    results_4layer = compare_activations_deep(
-        X_tr, y_tr, X_cv, y_cv,
-        activations=['relu', 'gelu', 'tanh', 'sigmoid'],
-        architecture='4layer',
-        use_batch_norm=False,
-        epochs=30,
-        batch_size=128,
-        learning_rate=0.001,
-        save_dir='models_tf_deep'
-    )
+    # results_4layer = compare_activations_deep(
+    #     X_tr, y_tr, X_cv, y_cv,
+    #     activations=['relu', 'gelu', 'tanh', 'sigmoid'],
+    #     architecture='4layer',
+    #     use_batch_norm=False,
+    #     epochs=30,
+    #     batch_size=128,
+    #     learning_rate=0.001,
+    #     save_dir='models_tf_deep'
+    # )
     
     
     # Experiment 3: 3-layer WITH batch norm
     # (Save this for AFTER you learn about batch normalization!)
-    """
     print("\n" + "#"*80)
     print("EXPERIMENT 3: 3-Layer Network (WITH Batch Norm)")
     print("Watch the gradient vanishing DISAPPEAR!")
@@ -728,7 +727,6 @@ if __name__ == "__main__":
         epochs=30,
         batch_size=128
     )
-    """
     
     print("\n\n" + "="*80)
     print("ALL EXPERIMENTS COMPLETE!")
