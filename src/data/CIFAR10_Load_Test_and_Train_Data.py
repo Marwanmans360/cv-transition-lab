@@ -1,6 +1,7 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 
 path = 'C:\\Users\\user\\OneDrive - TechnoVal\\Desktop\\Scripts\\ML\\cv-transition-lab\\data\\cifar-10-batches-py\\'
@@ -15,7 +16,7 @@ def load_cifar10(dir):
 
     X_train_list, y_train_list = [], []
     for i in range(1, 6):
-        batch_file = dir + f'data_batch_{i}'
+        batch_file = os.path.join(dir, f'data_batch_{i}')
         batch = load_batch(batch_file)
         X_train_list.append(batch[b'data'])
         y_train_list.append(batch[b'labels'])
@@ -24,7 +25,7 @@ def load_cifar10(dir):
     X_train = np.concatenate(X_train_list, axis = 0)
     y_train = np.concatenate(y_train_list,axis = 0)
 
-    test_path = dir + "test_batch"
+    test_path = os.path.join(dir, "test_batch")
     test_batch = load_batch(test_path)
     X_test = test_batch[b'data']
     y_test = np.array(test_batch[b'labels'])

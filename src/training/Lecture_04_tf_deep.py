@@ -686,8 +686,8 @@ if __name__ == "__main__":
         activations=['relu', 'gelu', 'tanh', 'sigmoid'],
         architecture='3layer',
         use_batch_norm=False,
-        epochs=100,  # Updated to 100 epochs
-        batch_size=128,
+        epochs=300,  # Updated to 300 epochs
+        batch_size=len(X_tr),  # Full data pass in one iteration
         learning_rate=0.001,
         save_dir='models_tf_deep'
     )
@@ -703,8 +703,8 @@ if __name__ == "__main__":
         activations=['relu', 'gelu', 'tanh', 'sigmoid'],
         architecture='4layer',
         use_batch_norm=False,
-        epochs=100,  # Updated to 100 epochs
-        batch_size=128,
+        epochs=300,  # Updated to 300 epochs
+        batch_size=len(X_tr),  # Full data pass in one iteration
         learning_rate=0.001,
         save_dir='models_tf_deep'
     )
@@ -721,7 +721,7 @@ if __name__ == "__main__":
         architecture='3layer',
         use_batch_norm=True,  # THE MAGIC SWITCH!
         epochs=300,  # Updated to 300 epochs
-        batch_size=128
+        batch_size=len(X_tr)  # Full data pass in one iteration
     )
 
     print("\n\n" + "="*80)
