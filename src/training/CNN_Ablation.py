@@ -118,14 +118,14 @@ def show_conv1_filters(model, number_to_show=16):
 # ============================================================
 
 class FirstBlock(nn.Module):
-    def __init__(self, norm_type='none'):
+    def __init__(self, norm_type='none', activation_type='relu'):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1) # Input channels = 3 (RGB), output channels (per filter) = 32
         self.norm1 = self._get_norm(norm_type, 32)
-        self.relu1 = nn.ReLU()
+        self.activation1 = self._get_activation(activation_type)
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1) # Input channels = 32 (from previous conv), output channels = 32 (same number of filters)
         self.norm2 = self._get_norm(norm_type, 32)
-        self.relu2 = nn.ReLU()
+        self.activation2 = self._get_activation(activation_type)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def _get_norm(self, norm_type, channels):
@@ -136,26 +136,32 @@ class FirstBlock(nn.Module):
         else:
             return nn.Identity()
 
+    def _get_activation(self, activation_type):
+        if activation_type == 'gelu':
+            return nn.GELU()
+        else:  # default to relu
+            return nn.ReLU()
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.norm1(x)
-        x = self.relu1(x)
+        x = self.activation1(x)
         x = self.conv2(x)
         x = self.norm2(x)
-        x = self.relu2(x)
+        x = self.activation2(x)
         x = self.pool(x)
         return x
 
 
 class SecondBlock(nn.Module):
-    def __init__(self, norm_type='none'):
+    def __init__(self, norm_type='none', activation_type='relu'):
         super().__init__()
         self.conv1 = nn.Conv2d(32, 64, kernel_size=3, padding=1) # Input channels = 32 (from previous block), output channels = 64
         self.norm1 = self._get_norm(norm_type, 64)
-        self.relu1 = nn.ReLU()
+        self.activation1 = self._get_activation(activation_type)
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1) # Input channels = 64 (from previous conv), output channels = 64 (same number of filters)
         self.norm2 = self._get_norm(norm_type, 64)
-        self.relu2 = nn.ReLU()
+        self.activation2 = self._get_activation(activation_type)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
     def _get_norm(self, norm_type, channels):
@@ -166,26 +172,32 @@ class SecondBlock(nn.Module):
         else:
             return nn.Identity()
 
+    def _get_activation(self, activation_type):
+        if activation_type == 'gelu':
+            return nn.GELU()
+        else:  # default to relu
+            return nn.ReLU()
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.norm1(x)
-        x = self.relu1(x)
+        x = self.activation1(x)
         x = self.conv2(x)
         x = self.norm2(x)
-        x = self.relu2(x)
+        x = self.activation2(x)
         x = self.pool(x)
         return x
 
 
 class ThirdBlock(nn.Module):
-    def __init__(self, norm_type='none'):
+    def __init__(self, norm_type='none', activation_type='relu'):
         super().__init__()
         self.conv1 = nn.Conv2d(64, 128, kernel_size=3, padding=1) # Input channels = 64 (from previous block), output channels = 128, stride=1, padding=1 to keep spatial dimensions the same
         self.norm1 = self._get_norm(norm_type, 128)
-        self.relu1 = nn.ReLU()
+        self.activation1 = self._get_activation(activation_type)
         self.conv2 = nn.Conv2d(128, 128, kernel_size=3, padding=1) # Input channels = 128 (from previous conv), output channels = 128 (same number of filters)
         self.norm2 = self._get_norm(norm_type, 128)
-        self.relu2 = nn.ReLU()
+        self.activation2 = self._get_activation(activation_type)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2) # After this block, the spatial dimensions will be reduced to 4x4 (from 32x32 -> 16x16 -> 8x8 -> 4x4) because of the 3 pooling layers
 
     def _get_norm(self, norm_type, channels):
@@ -196,31 +208,43 @@ class ThirdBlock(nn.Module):
         else:
             return nn.Identity()
 
+    def _get_activation(self, activation_type):
+        if activation_type == 'gelu':
+            return nn.GELU()
+        else:  # default to relu
+            return nn.ReLU()
+
     def forward(self, x):
         x = self.conv1(x)
         x = self.norm1(x)
-        x = self.relu1(x)
+        x = self.activation1(x)
         x = self.conv2(x)
         x = self.norm2(x)
-        x = self.relu2(x)
+        x = self.activation2(x)
         x = self.pool(x)
         return x
 
 
 class MiniVGG(nn.Module):
-    def __init__(self, dropout_p=0.0, norm_type='none'):
+    def __init__(self, dropout_p=0.0, norm_type='none', activation_type='relu'):
         super().__init__()
-        self.block1 = FirstBlock(norm_type=norm_type)
-        self.block2 = SecondBlock(norm_type=norm_type)
-        self.block3 = ThirdBlock(norm_type=norm_type)
+        self.block1 = FirstBlock(norm_type=norm_type, activation_type=activation_type)
+        self.block2 = SecondBlock(norm_type=norm_type, activation_type=activation_type)
+        self.block3 = ThirdBlock(norm_type=norm_type, activation_type=activation_type)
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Linear(128 * 4 * 4, 256),
-            nn.ReLU(),
+            self._get_activation(activation_type),
             nn.Dropout(dropout_p) if dropout_p > 0 else nn.Identity(),
             nn.Linear(256, 10),
         )
+
+    def _get_activation(self, activation_type):
+        if activation_type == 'gelu':
+            return nn.GELU()
+        else:  # default to relu
+            return nn.ReLU()
 
     def forward(self, x):
         x = self.block1(x)
@@ -444,18 +468,19 @@ def main():
     img_hwc_uint8 = unnormalize_chw_to_hwc_uint8(Xb[0], mean, std)
     show_image_hwc_uint8(img_hwc_uint8, title=f"From loader | label={class_names[int(yb[0].item())]}")
 
-    # Test different normalization techniques with dropout=0.5
-    norm_types = ['none', 'batch', 'group']  # No norm, BatchNorm, GroupNorm
-    dropout_p = 0.5  # Use optimal dropout rate from previous study
+    # Test different activation functions with BatchNorm and dropout=0.5
+    activation_types = ['relu', 'gelu']  # ReLU vs GeLU
+    norm_type = 'batch'  # Fixed to BatchNorm
+    dropout_p = 0.5  # Fixed to optimal dropout rate
     results = {}
 
-    for run_id, norm_type in enumerate(norm_types):
+    for run_id, activation_type in enumerate(activation_types):
         print(f"\n{'='*60}")
-        print(f"Run {run_id + 1}: Normalization = {norm_type.upper()}, Dropout = {dropout_p}")
+        print(f"Run {run_id + 1}: Activation = {activation_type.upper()}, Normalization = BATCH, Dropout = {dropout_p}")
         print(f"{'='*60}")
 
         # 9) Build model
-        model = MiniVGG(dropout_p=dropout_p, norm_type=norm_type).to(device)
+        model = MiniVGG(dropout_p=dropout_p, norm_type=norm_type, activation_type=activation_type).to(device)
         initialize_weights(model)
 
         # sanity forward
@@ -470,7 +495,7 @@ def main():
         overfit_one_batch(model, train_loader, device, steps=300, lr=0.01)
 
         # 11) Baseline training
-        print(f"=== Training baseline (Run {run_id + 1}, Normalization={norm_type.upper()}) ===")
+        print(f"=== Training baseline (Run {run_id + 1}, Activation={activation_type.upper()}) ===")
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 30], gamma=0.1)
 
@@ -516,7 +541,7 @@ def main():
             print(f"{layer_name}: mean={stats['mean']:.4f}, std={stats['std']:.4f}, %zeros={stats['percent_zeros']:.2f}%")
 
         # Store results for comparison
-        results[f"Norm_{norm_type}"] = {
+        results[f"Act_{activation_type}"] = {
             "best_val_acc": best_val,
             "test_acc": te_acc,
             "test_loss": te_loss,
@@ -533,12 +558,12 @@ def main():
     print(f"{'='*60}")
     
     # Create summary table
-    print("\n📊 NORMALIZATION ABLATION STUDY RESULTS (Dropout=0.5):")
-    print(f"{'Normalization':<20} {'Best Val Acc':<15} {'Test Acc':<15} {'Test Loss':<15}")
+    print("\n📊 ACTIVATION ABLATION STUDY RESULTS (BatchNorm, Dropout=0.5):")
+    print(f"{'Activation':<20} {'Best Val Acc':<15} {'Test Acc':<15} {'Test Loss':<15}")
     print("-" * 65)
     for run_name, metrics in results.items():
-        norm_type = run_name.split("_")[1]
-        print(f"{norm_type.upper():<20} {metrics['best_val_acc']:<15.3f} {metrics['test_acc']:<15.3f} {metrics['test_loss']:<15.3f}")
+        activation_type = run_name.split("_")[1]
+        print(f"{activation_type.upper():<20} {metrics['best_val_acc']:<15.3f} {metrics['test_acc']:<15.3f} {metrics['test_loss']:<15.3f}")
     
     # Plot 1: Accuracy curves (train vs val)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
