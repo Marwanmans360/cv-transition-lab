@@ -118,59 +118,101 @@ def show_conv1_filters(model, number_to_show=16):
 # ============================================================
 
 class FirstBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, norm_type='none'):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1) # Input channels = 3 (RGB), output channels (per filter) = 32
+        self.norm1 = self._get_norm(norm_type, 32)
         self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(32, 32, kernel_size=3, padding=1) # Input channels = 32 (from previous conv), output channels = 32 (same number of filters)
+        self.norm2 = self._get_norm(norm_type, 32)
         self.relu2 = nn.ReLU()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
+    def _get_norm(self, norm_type, channels):
+        if norm_type == 'batch':
+            return nn.BatchNorm2d(channels)
+        elif norm_type == 'group':
+            return nn.GroupNorm(16, channels)  # 16 groups for 32 channels
+        else:
+            return nn.Identity()
+
     def forward(self, x):
-        x = self.relu1(self.conv1(x))
-        x = self.relu2(self.conv2(x))
+        x = self.conv1(x)
+        x = self.norm1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.norm2(x)
+        x = self.relu2(x)
         x = self.pool(x)
         return x
 
 
 class SecondBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, norm_type='none'):
         super().__init__()
         self.conv1 = nn.Conv2d(32, 64, kernel_size=3, padding=1) # Input channels = 32 (from previous block), output channels = 64
+        self.norm1 = self._get_norm(norm_type, 64)
         self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1) # Input channels = 64 (from previous conv), output channels = 64 (same number of filters)
+        self.norm2 = self._get_norm(norm_type, 64)
         self.relu2 = nn.ReLU()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
+    def _get_norm(self, norm_type, channels):
+        if norm_type == 'batch':
+            return nn.BatchNorm2d(channels)
+        elif norm_type == 'group':
+            return nn.GroupNorm(16, channels)  # 16 groups for 64 channels
+        else:
+            return nn.Identity()
+
     def forward(self, x):
-        x = self.relu1(self.conv1(x))
-        x = self.relu2(self.conv2(x))
+        x = self.conv1(x)
+        x = self.norm1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.norm2(x)
+        x = self.relu2(x)
         x = self.pool(x)
         return x
 
 
 class ThirdBlock(nn.Module):
-    def __init__(self):
+    def __init__(self, norm_type='none'):
         super().__init__()
         self.conv1 = nn.Conv2d(64, 128, kernel_size=3, padding=1) # Input channels = 64 (from previous block), output channels = 128, stride=1, padding=1 to keep spatial dimensions the same
+        self.norm1 = self._get_norm(norm_type, 128)
         self.relu1 = nn.ReLU()
         self.conv2 = nn.Conv2d(128, 128, kernel_size=3, padding=1) # Input channels = 128 (from previous conv), output channels = 128 (same number of filters)
+        self.norm2 = self._get_norm(norm_type, 128)
         self.relu2 = nn.ReLU()
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2) # After this block, the spatial dimensions will be reduced to 4x4 (from 32x32 -> 16x16 -> 8x8 -> 4x4) because of the 3 pooling layers
 
+    def _get_norm(self, norm_type, channels):
+        if norm_type == 'batch':
+            return nn.BatchNorm2d(channels)
+        elif norm_type == 'group':
+            return nn.GroupNorm(16, channels)  # 16 groups for 128 channels
+        else:
+            return nn.Identity()
+
     def forward(self, x):
-        x = self.relu1(self.conv1(x))
-        x = self.relu2(self.conv2(x))
+        x = self.conv1(x)
+        x = self.norm1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.norm2(x)
+        x = self.relu2(x)
         x = self.pool(x)
         return x
 
 
 class MiniVGG(nn.Module):
-    def __init__(self, dropout_p=0.0):
+    def __init__(self, dropout_p=0.0, norm_type='none'):
         super().__init__()
-        self.block1 = FirstBlock()
-        self.block2 = SecondBlock()
-        self.block3 = ThirdBlock()
+        self.block1 = FirstBlock(norm_type=norm_type)
+        self.block2 = SecondBlock(norm_type=norm_type)
+        self.block3 = ThirdBlock(norm_type=norm_type)
 
         self.classifier = nn.Sequential(
             nn.Flatten(),
@@ -336,7 +378,7 @@ def main():
     print("Device:", device)
 
     # Toggle between local and Colab paths
-    use_colab = False  # Set to True for Google Colab
+    use_colab = True  # Set to True for Google Colab
     
     if use_colab:
         cifar_folder = "/content/drive/MyDrive/datasets/cifar-10-batches-py"
@@ -402,17 +444,18 @@ def main():
     img_hwc_uint8 = unnormalize_chw_to_hwc_uint8(Xb[0], mean, std)
     show_image_hwc_uint8(img_hwc_uint8, title=f"From loader | label={class_names[int(yb[0].item())]}")
 
-    # Test different dropout rates
-    dropout_rates = [0.0, 0.3, 0.5]
+    # Test different normalization techniques with dropout=0.5
+    norm_types = ['none', 'batch', 'group']  # No norm, BatchNorm, GroupNorm
+    dropout_p = 0.5  # Use optimal dropout rate from previous study
     results = {}
 
-    for run_id, dropout_p in enumerate(dropout_rates):
+    for run_id, norm_type in enumerate(norm_types):
         print(f"\n{'='*60}")
-        print(f"Run {run_id + 1}: Dropout p = {dropout_p}")
+        print(f"Run {run_id + 1}: Normalization = {norm_type.upper()}, Dropout = {dropout_p}")
         print(f"{'='*60}")
 
         # 9) Build model
-        model = MiniVGG(dropout_p=dropout_p).to(device)
+        model = MiniVGG(dropout_p=dropout_p, norm_type=norm_type).to(device)
         initialize_weights(model)
 
         # sanity forward
@@ -427,7 +470,7 @@ def main():
         overfit_one_batch(model, train_loader, device, steps=300, lr=0.01)
 
         # 11) Baseline training
-        print(f"=== Training baseline (Run {run_id + 1}, Dropout={dropout_p}) ===")
+        print(f"=== Training baseline (Run {run_id + 1}, Normalization={norm_type.upper()}) ===")
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 30], gamma=0.1)
 
@@ -473,7 +516,7 @@ def main():
             print(f"{layer_name}: mean={stats['mean']:.4f}, std={stats['std']:.4f}, %zeros={stats['percent_zeros']:.2f}%")
 
         # Store results for comparison
-        results[f"Dropout_{dropout_p}"] = {
+        results[f"Norm_{norm_type}"] = {
             "best_val_acc": best_val,
             "test_acc": te_acc,
             "test_loss": te_loss,
@@ -490,77 +533,78 @@ def main():
     print(f"{'='*60}")
     
     # Create summary table
-    print("\n📊 ABLATION STUDY RESULTS:")
-    print(f"{'Dropout Rate':<15} {'Best Val Acc':<15} {'Test Acc':<15} {'Test Loss':<15}")
-    print("-" * 60)
+    print("\n📊 NORMALIZATION ABLATION STUDY RESULTS (Dropout=0.5):")
+    print(f"{'Normalization':<20} {'Best Val Acc':<15} {'Test Acc':<15} {'Test Loss':<15}")
+    print("-" * 65)
     for run_name, metrics in results.items():
-        dropout_p = float(run_name.split("_")[1])
-        print(f"{dropout_p:<15.1f} {metrics['best_val_acc']:<15.3f} {metrics['test_acc']:<15.3f} {metrics['test_loss']:<15.3f}")
+        norm_type = run_name.split("_")[1]
+        print(f"{norm_type.upper():<20} {metrics['best_val_acc']:<15.3f} {metrics['test_acc']:<15.3f} {metrics['test_loss']:<15.3f}")
     
     # Plot 1: Accuracy curves (train vs val)
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
     
     for run_name, metrics in results.items():
-        dropout_p = float(run_name.split("_")[1])
+        norm_type = run_name.split("_")[1]
         epochs_range = range(1, len(metrics['train_accs']) + 1)
         
-        axes[0].plot(epochs_range, metrics['train_accs'], 'o-', label=f'Train (dropout={dropout_p})', linewidth=2, markersize=4)
-        axes[0].plot(epochs_range, metrics['val_accs'], 's--', label=f'Val (dropout={dropout_p})', linewidth=2, markersize=4)
+        axes[0].plot(epochs_range, metrics['train_accs'], 'o-', label=f'Train ({norm_type})', linewidth=2, markersize=4)
+        axes[0].plot(epochs_range, metrics['val_accs'], 's--', label=f'Val ({norm_type})', linewidth=2, markersize=4)
     
     axes[0].set_xlabel("Epoch", fontsize=12)
     axes[0].set_ylabel("Accuracy", fontsize=12)
-    axes[0].set_title("Train vs Validation Accuracy", fontsize=14, fontweight='bold')
+    axes[0].set_title("Train vs Validation Accuracy (Dropout=0.5)", fontsize=14, fontweight='bold')
     axes[0].legend(fontsize=10)
     axes[0].grid(True, alpha=0.3)
     
     # Plot 2: Loss curves (train vs val)
     for run_name, metrics in results.items():
-        dropout_p = float(run_name.split("_")[1])
+        norm_type = run_name.split("_")[1]
         epochs_range = range(1, len(metrics['train_losses']) + 1)
         
-        axes[1].plot(epochs_range, metrics['train_losses'], 'o-', label=f'Train (dropout={dropout_p})', linewidth=2, markersize=4)
-        axes[1].plot(epochs_range, metrics['val_losses'], 's--', label=f'Val (dropout={dropout_p})', linewidth=2, markersize=4)
+        axes[1].plot(epochs_range, metrics['train_losses'], 'o-', label=f'Train ({norm_type})', linewidth=2, markersize=4)
+        axes[1].plot(epochs_range, metrics['val_losses'], 's--', label=f'Val ({norm_type})', linewidth=2, markersize=4)
     
     axes[1].set_xlabel("Epoch", fontsize=12)
     axes[1].set_ylabel("Loss", fontsize=12)
-    axes[1].set_title("Train vs Validation Loss", fontsize=14, fontweight='bold')
+    axes[1].set_title("Train vs Validation Loss (Dropout=0.5)", fontsize=14, fontweight='bold')
     axes[1].legend(fontsize=10)
     axes[1].grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("training_curves.png", dpi=150, bbox_inches='tight')
-    print("\n✅ Plot saved as 'training_curves.png'")
+    plt.savefig("training_curves_norm.png", dpi=150, bbox_inches='tight')
+    print("\n✅ Plot saved as 'training_curves_norm.png'")
     plt.show()
     
     # Plot 3: Train-Val Gap (Regularization Effect)
+    # Plot 3: Train-Val Gap (Normalization Effect)
     fig, ax = plt.subplots(figsize=(12, 6))
     
     for run_name, metrics in results.items():
-        dropout_p = float(run_name.split("_")[1])
+        norm_type = run_name.split("_")[1]
         epochs_range = range(1, len(metrics['train_accs']) + 1)
         gap = [t - v for t, v in zip(metrics['train_accs'], metrics['val_accs'])]
         
-        ax.plot(epochs_range, gap, 'o-', label=f'Gap (dropout={dropout_p})', linewidth=2.5, markersize=5)
+        ax.plot(epochs_range, gap, 'o-', label=f'Gap ({norm_type})', linewidth=2.5, markersize=5)
     
     ax.set_xlabel("Epoch", fontsize=12)
     ax.set_ylabel("Train - Val Accuracy", fontsize=12)
-    ax.set_title("Regularization Effect: Train-Val Accuracy Gap", fontsize=14, fontweight='bold')
+    ax.set_title("Impact of Normalization: Train-Val Accuracy Gap (Dropout=0.5)", fontsize=14, fontweight='bold')
     ax.legend(fontsize=11)
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='k', linestyle='--', alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig("regularization_gap.png", dpi=150, bbox_inches='tight')
-    print("✅ Plot saved as 'regularization_gap.png'")
+    plt.savefig("normalization_gap.png", dpi=150, bbox_inches='tight')
+    print("✅ Plot saved as 'normalization_gap.png'")
     plt.show()
     
     # Print detailed activation statistics
     print(f"\n{'='*60}")
-    print("ACTIVATION STATISTICS")
+    print("ACTIVATION STATISTICS (Dropout=0.5)")
     print(f"{'='*60}")
     for run_name, metrics in results.items():
-        dropout_p = float(run_name.split("_")[1])
-        print(f"\n🔍 Dropout={dropout_p}:")
+        norm_type = run_name.split("_")[1]
+        print(f"\n🔍 Normalization={norm_type.upper()}:")
         for layer_name, stats in metrics['activation_stats'].items():
             print(f"  {layer_name}:")
             print(f"    Mean: {stats['mean']:.6f}")
@@ -570,10 +614,10 @@ def main():
     print(f"\n{'='*60}")
     print("🎓 KEY INSIGHTS")
     print(f"{'='*60}")
-    print("✓ Higher dropout rates reduce the train-val accuracy gap")
-    print("✓ Dropout acts as regularization to prevent overfitting")
-    print("✓ Compare activation statistics to see how dropout affects feature learning")
-    print("✓ A smaller train-val gap indicates better generalization")
+    print("✓ Batch Normalization stabilizes training and reduces internal covariate shift")
+    print("✓ Group Normalization works well with smaller batch sizes")
+    print("✓ Compare activation statistics to see how normalization affects feature learning")
+    print("✓ Normalization techniques impact the train-val gap and generalization performance")
 
 
 if __name__ == "__main__":
