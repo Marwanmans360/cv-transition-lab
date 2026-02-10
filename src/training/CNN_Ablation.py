@@ -736,10 +736,11 @@ def main():
 
         # Visualize filters BEFORE training
         print("\n=== PRE-TRAINING LAYER VISUALIZATION ===")
-        print("📊 Visualizing filters BEFORE training...")
-        visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="pre", activation_type=activation_type)
-        visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="pre", activation_type=activation_type)
-        visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="pre", activation_type=activation_type)
+        print("📊 Skipping pre-training visualizations (run CNN_Visualize.py instead)...")
+        # print("📊 Visualizing filters BEFORE training...")
+        # visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="pre", activation_type=activation_type)
+        # visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="pre", activation_type=activation_type)
+        # visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="pre", activation_type=activation_type)
 
         # 11) Baseline training
         print(f"=== Training baseline (Run {run_id + 1}, Activation={activation_type.upper()}) ===")
@@ -789,16 +790,30 @@ def main():
 
         # Visualize learned layers
         print("\n=== POST-TRAINING LAYER VISUALIZATION ===")
-        print("📊 Visualizing filters AFTER training...")
-        visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="post", activation_type=activation_type)
-        visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="post", activation_type=activation_type)
-        visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="post", activation_type=activation_type)
-        
-        print("📊 Visualizing activation maps AFTER training...")
-        visualize_activation_maps(model, val_loader, device, num_images=3, stage="post", activation_type=activation_type)
-        
-        print("📊 Visualizing learned representations (t-SNE) AFTER training...")
-        visualize_learned_representations(model, val_loader, device, num_samples=10, stage="post", activation_type=activation_type)
+        print("📊 Skipping visualizations (run CNN_Visualize.py instead)...")
+        # print("📊 Visualizing filters AFTER training...")
+        # visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="post", activation_type=activation_type)
+        # visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="post", activation_type=activation_type)
+        # visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="post", activation_type=activation_type)
+        # 
+        # print("📊 Visualizing activation maps AFTER training...")
+        # visualize_activation_maps(model, val_loader, device, num_images=3, stage="post", activation_type=activation_type)
+        # 
+        # print("📊 Visualizing learned representations (t-SNE) AFTER training...")
+        # visualize_learned_representations(model, val_loader, device, num_samples=10, stage="post", activation_type=activation_type)
+
+        # Save model weights
+        model_save_path = f"model_weights_act_{activation_type}.pth"
+        torch.save({
+            'model_state_dict': best_state,
+            'activation_type': activation_type,
+            'norm_type': norm_type,
+            'dropout_p': dropout_p,
+            'best_val_acc': best_val,
+            'test_acc': te_acc,
+            'test_loss': te_loss
+        }, model_save_path)
+        print(f"✅ Saved model weights: {model_save_path}")
 
         # Store results for comparison
         results[f"Act_{activation_type}"] = {
@@ -809,7 +824,8 @@ def main():
             "train_losses": train_losses,
             "val_accs": val_accs,
             "val_losses": val_losses,
-            "activation_stats": act_stats
+            "activation_stats": act_stats,
+            "model_path": model_save_path
         }
 
     # Print summary of all runs
