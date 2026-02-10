@@ -113,6 +113,229 @@ def show_conv1_filters(model, number_to_show=16):
     plt.show()
 
 
+def visualize_layer_filters(model, layer_name, block_num, number_to_show=16):
+    """
+    Visualize learned filters from a specific block's first conv layer.
+    Args:
+        model: MiniVGG model
+        layer_name: 'block1', 'block2', or 'block3'
+        block_num: block number for title
+        number_to_show: number of filters to display
+    """
+    if layer_name == 'block1':
+        W = model.block1.conv1.weight.data.cpu()  # (32,3,3,3)
+        in_channels = 3
+        out_channels = 32
+    elif layer_name == 'block2':
+        W = model.block2.conv1.weight.data.cpu()  # (64,32,3,3)
+        in_channels = 32
+        out_channels = 64
+    elif layer_name == 'block3':
+        W = model.block3.conv1.weight.data.cpu()  # (128,64,3,3)
+        in_channels = 64
+        out_channels = 128
+    else:
+        raise ValueError(f"Unknown layer: {layer_name}")
+
+    n = min(number_to_show, out_channels)
+    grid_size = int(np.ceil(np.sqrt(n)))
+
+    fig, axes = plt.subplots(grid_size, grid_size, figsize=(10, 10))
+    axes = np.array(axes).reshape(-1)
+
+    for i in range(grid_size * grid_size):
+        axes[i].axis("off")
+        if i >= n:
+            continue
+
+        k = W[i]  # (in_channels, 3, 3)
+        
+        # Normalize for visualization
+        k = (k - k.min()) / (k.max() - k.min() + 1e-8)
+        
+        # For RGB input, show first 3 channels; for others, average
+        if in_channels >= 3:
+            k_hwc = k[:3].permute(1, 2, 0)
+        else:
+            k_hwc = k[0]
+        
+        axes[i].imshow(k_hwc)
+        axes[i].set_title(f"F{i}", fontsize=8)
+
+    fig.suptitle(f"Learned Filters - {layer_name.upper()} Conv1", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_activation_maps(model, data_loader, device, num_images=4):
+    """
+    Visualize activation maps for the first num_images in the loader.
+    Shows activations from the end of each block.
+    """
+    model.eval()
+    
+    # Hooks to capture activations
+    activations = {}
+    
+    def get_activation(name):
+        def hook(model, input, output):
+            activations[name] = output.detach()
+        return hook
+    
+    # Register hooks
+    hooks = []
+    hooks.append(model.block1.pool.register_forward_hook(get_activation('block1')))
+    hooks.append(model.block2.pool.register_forward_hook(get_activation('block2')))
+    hooks.append(model.block3.pool.register_forward_hook(get_activation('block3')))
+    
+    with torch.no_grad():
+        for batch_idx, (X, y) in enumerate(data_loader):
+            if batch_idx >= num_images:
+                break
+            
+            X = X.to(device)
+            _ = model(X)
+            
+            # Visualize for first sample in batch
+            img_idx = 0
+            
+            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+            
+            for block_name, idx in [('block1', 0), ('block2', 1), ('block3', 2)]:
+                act = activations[block_name][img_idx].cpu().numpy()
+                # Show mean activation across channels
+                act_mean = np.mean(act, axis=0)
+                
+                im = axes[idx].imshow(act_mean, cmap='viridis')
+                axes[idx].set_title(f"{block_name.upper()} Activations")
+                axes[idx].axis("off")
+                plt.colorbar(im, ax=axes[idx], fraction=0.046, pad=0.04)
+            
+            fig.suptitle(f"Activation Maps - Sample {batch_idx + 1}", fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            plt.show()
+    
+    # Remove hooks
+    for hook in hooks:
+        hook.remove()
+
+
+def get_feature_maps(model, data_loader, device, num_batches=1):
+    """
+    Extract and return feature maps from intermediate layers for analysis.
+    """
+    model.eval()
+    
+    features = {
+        'block1': [],
+        'block2': [],
+        'block3': [],
+    }
+    
+    def get_activation(name):
+        def hook(model, input, output):
+            features[name].append(output.detach().cpu().numpy())
+        return hook
+    
+    hooks = []
+    hooks.append(model.block1.pool.register_forward_hook(get_activation('block1')))
+    hooks.append(model.block2.pool.register_forward_hook(get_activation('block2')))
+    hooks.append(model.block3.pool.register_forward_hook(get_activation('block3')))
+    
+    with torch.no_grad():
+        for batch_idx, (X, y) in enumerate(data_loader):
+            if batch_idx >= num_batches:
+                break
+            X = X.to(device)
+            _ = model(X)
+    
+    for hook in hooks:
+        hook.remove()
+    
+    return features
+
+
+def visualize_learned_representations(model, data_loader, device, num_samples=10):
+    """
+    Visualize learned representations through t-SNE (requires scikit-learn).
+    Shows how the model organizes features at different depths.
+    """
+    try:
+        from sklearn.manifold import TSNE
+    except ImportError:
+        print("⚠️  scikit-learn not available. Skipping t-SNE visualization.")
+        return
+    
+    model.eval()
+    
+    # Collect features from different layers
+    all_features = {
+        'block1': [],
+        'block2': [],
+        'block3': [],
+        'classifier_input': []
+    }
+    all_labels = []
+    
+    def get_activation(name):
+        def hook(model, input, output):
+            all_features[name].append(output.detach().cpu().numpy())
+        return hook
+    
+    hooks = []
+    hooks.append(model.block1.pool.register_forward_hook(get_activation('block1')))
+    hooks.append(model.block2.pool.register_forward_hook(get_activation('block2')))
+    hooks.append(model.block3.pool.register_forward_hook(get_activation('block3')))
+    
+    # Hook before classifier
+    def before_classifier(model, input, output):
+        all_features['classifier_input'].append(input[0].detach().cpu().numpy())
+    hooks.append(model.classifier[0].register_forward_hook(before_classifier))
+    
+    with torch.no_grad():
+        for batch_idx, (X, y) in enumerate(data_loader):
+            if batch_idx >= 5:  # Use first 5 batches
+                break
+            X = X.to(device)
+            _ = model(X)
+            all_labels.extend(y.cpu().numpy())
+    
+    for hook in hooks:
+        hook.remove()
+    
+    # Flatten and concatenate features
+    for layer_name in all_features:
+        if all_features[layer_name]:
+            all_features[layer_name] = np.concatenate(all_features[layer_name], axis=0)
+            # Flatten spatial dimensions
+            if len(all_features[layer_name].shape) == 4:  # (batch, channels, height, width)
+                batch_size = all_features[layer_name].shape[0]
+                all_features[layer_name] = all_features[layer_name].reshape(batch_size, -1)
+    
+    all_labels = np.array(all_labels)
+    
+    # Visualize with t-SNE
+    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+    axes = axes.flatten()
+    
+    for idx, layer_name in enumerate(['block1', 'block2', 'block3', 'classifier_input']):
+        if all_features[layer_name].size > 0:
+            # Use t-SNE for dimensionality reduction
+            tsne = TSNE(n_components=2, random_state=42, perplexity=30, n_iter=1000)
+            features_2d = tsne.fit_transform(all_features[layer_name])
+            
+            scatter = axes[idx].scatter(features_2d[:, 0], features_2d[:, 1], 
+                                       c=all_labels, cmap='tab10', alpha=0.6, s=50)
+            axes[idx].set_title(f"t-SNE: {layer_name.upper()}", fontsize=12, fontweight='bold')
+            axes[idx].set_xlabel("t-SNE 1")
+            axes[idx].set_ylabel("t-SNE 2")
+            plt.colorbar(scatter, ax=axes[idx], label="Class")
+    
+    fig.suptitle("Learned Representations at Different Depths", fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.show()
+
+
 # ============================================================
 # MODEL: MINI-VGG STYLE (your 3 blocks)
 # ============================================================
@@ -494,6 +717,13 @@ def main():
         # 10) Overfit-one-batch test (debug)
         overfit_one_batch(model, train_loader, device, steps=300, lr=0.01)
 
+        # Visualize filters BEFORE training
+        print("\n=== PRE-TRAINING LAYER VISUALIZATION ===")
+        print("📊 Visualizing filters BEFORE training...")
+        visualize_layer_filters(model, 'block1', 1, number_to_show=16)
+        visualize_layer_filters(model, 'block2', 2, number_to_show=16)
+        visualize_layer_filters(model, 'block3', 3, number_to_show=16)
+
         # 11) Baseline training
         print(f"=== Training baseline (Run {run_id + 1}, Activation={activation_type.upper()}) ===")
         optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
@@ -539,6 +769,19 @@ def main():
         act_stats = compute_activation_stats(model, val_loader, device, num_batches=5)
         for layer_name, stats in act_stats.items():
             print(f"{layer_name}: mean={stats['mean']:.4f}, std={stats['std']:.4f}, %zeros={stats['percent_zeros']:.2f}%")
+
+        # Visualize learned layers
+        print("\n=== POST-TRAINING LAYER VISUALIZATION ===")
+        print("📊 Visualizing filters AFTER training...")
+        visualize_layer_filters(model, 'block1', 1, number_to_show=16)
+        visualize_layer_filters(model, 'block2', 2, number_to_show=16)
+        visualize_layer_filters(model, 'block3', 3, number_to_show=16)
+        
+        print("📊 Visualizing activation maps AFTER training...")
+        visualize_activation_maps(model, val_loader, device, num_images=3)
+        
+        print("📊 Visualizing learned representations (t-SNE) AFTER training...")
+        visualize_learned_representations(model, val_loader, device, num_samples=10)
 
         # Store results for comparison
         results[f"Act_{activation_type}"] = {
