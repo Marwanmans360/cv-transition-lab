@@ -113,7 +113,7 @@ def show_conv1_filters(model, number_to_show=16):
     plt.show()
 
 
-def visualize_layer_filters(model, layer_name, block_num, number_to_show=16):
+def visualize_layer_filters(model, layer_name, block_num, number_to_show=16, stage="pre", activation_type="relu"):
     """
     Visualize learned filters from a specific block's first conv layer.
     Args:
@@ -121,6 +121,8 @@ def visualize_layer_filters(model, layer_name, block_num, number_to_show=16):
         layer_name: 'block1', 'block2', or 'block3'
         block_num: block number for title
         number_to_show: number of filters to display
+        stage: 'pre' or 'post' training
+        activation_type: activation function used
     """
     if layer_name == 'block1':
         W = model.block1.conv1.weight.data.cpu()  # (32,3,3,3)
@@ -162,12 +164,17 @@ def visualize_layer_filters(model, layer_name, block_num, number_to_show=16):
         axes[i].imshow(k_hwc)
         axes[i].set_title(f"F{i}", fontsize=8)
 
-    fig.suptitle(f"Learned Filters - {layer_name.upper()} Conv1", fontsize=14, fontweight='bold')
+    fig.suptitle(f"Learned Filters - {layer_name.upper()} Conv1 ({stage.upper()})", fontsize=14, fontweight='bold')
     plt.tight_layout()
+    
+    # Save figure
+    filename = f"filters_{stage}_{activation_type}_{layer_name}.png"
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
+    print(f"✅ Saved: {filename}")
     plt.show()
 
 
-def visualize_activation_maps(model, data_loader, device, num_images=4):
+def visualize_activation_maps(model, data_loader, device, num_images=4, stage="post", activation_type="relu"):
     """
     Visualize activation maps for the first num_images in the loader.
     Shows activations from the end of each block.
@@ -211,8 +218,13 @@ def visualize_activation_maps(model, data_loader, device, num_images=4):
                 axes[idx].axis("off")
                 plt.colorbar(im, ax=axes[idx], fraction=0.046, pad=0.04)
             
-            fig.suptitle(f"Activation Maps - Sample {batch_idx + 1}", fontsize=14, fontweight='bold')
+            fig.suptitle(f"Activation Maps - Sample {batch_idx + 1} ({stage.upper()})", fontsize=14, fontweight='bold')
             plt.tight_layout()
+            
+            # Save figure
+            filename = f"activation_maps_{stage}_{activation_type}_sample{batch_idx+1}.png"
+            plt.savefig(filename, dpi=150, bbox_inches='tight')
+            print(f"✅ Saved: {filename}")
             plt.show()
     
     # Remove hooks
@@ -255,7 +267,7 @@ def get_feature_maps(model, data_loader, device, num_batches=1):
     return features
 
 
-def visualize_learned_representations(model, data_loader, device, num_samples=10):
+def visualize_learned_representations(model, data_loader, device, num_samples=10, stage="post", activation_type="relu"):
     """
     Visualize learned representations through t-SNE (requires scikit-learn).
     Shows how the model organizes features at different depths.
@@ -331,8 +343,13 @@ def visualize_learned_representations(model, data_loader, device, num_samples=10
             axes[idx].set_ylabel("t-SNE 2")
             plt.colorbar(scatter, ax=axes[idx], label="Class")
     
-    fig.suptitle("Learned Representations at Different Depths", fontsize=14, fontweight='bold')
+    fig.suptitle(f"Learned Representations at Different Depths ({stage.upper()})", fontsize=14, fontweight='bold')
     plt.tight_layout()
+    
+    # Save figure
+    filename = f"tsne_representations_{stage}_{activation_type}.png"
+    plt.savefig(filename, dpi=150, bbox_inches='tight')
+    print(f"✅ Saved: {filename}")
     plt.show()
 
 
@@ -720,9 +737,9 @@ def main():
         # Visualize filters BEFORE training
         print("\n=== PRE-TRAINING LAYER VISUALIZATION ===")
         print("📊 Visualizing filters BEFORE training...")
-        visualize_layer_filters(model, 'block1', 1, number_to_show=16)
-        visualize_layer_filters(model, 'block2', 2, number_to_show=16)
-        visualize_layer_filters(model, 'block3', 3, number_to_show=16)
+        visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="pre", activation_type=activation_type)
+        visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="pre", activation_type=activation_type)
+        visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="pre", activation_type=activation_type)
 
         # 11) Baseline training
         print(f"=== Training baseline (Run {run_id + 1}, Activation={activation_type.upper()}) ===")
@@ -773,15 +790,15 @@ def main():
         # Visualize learned layers
         print("\n=== POST-TRAINING LAYER VISUALIZATION ===")
         print("📊 Visualizing filters AFTER training...")
-        visualize_layer_filters(model, 'block1', 1, number_to_show=16)
-        visualize_layer_filters(model, 'block2', 2, number_to_show=16)
-        visualize_layer_filters(model, 'block3', 3, number_to_show=16)
+        visualize_layer_filters(model, 'block1', 1, number_to_show=16, stage="post", activation_type=activation_type)
+        visualize_layer_filters(model, 'block2', 2, number_to_show=16, stage="post", activation_type=activation_type)
+        visualize_layer_filters(model, 'block3', 3, number_to_show=16, stage="post", activation_type=activation_type)
         
         print("📊 Visualizing activation maps AFTER training...")
-        visualize_activation_maps(model, val_loader, device, num_images=3)
+        visualize_activation_maps(model, val_loader, device, num_images=3, stage="post", activation_type=activation_type)
         
         print("📊 Visualizing learned representations (t-SNE) AFTER training...")
-        visualize_learned_representations(model, val_loader, device, num_samples=10)
+        visualize_learned_representations(model, val_loader, device, num_samples=10, stage="post", activation_type=activation_type)
 
         # Store results for comparison
         results[f"Act_{activation_type}"] = {
