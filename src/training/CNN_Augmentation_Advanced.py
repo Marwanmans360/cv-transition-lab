@@ -26,6 +26,7 @@ from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -231,15 +232,18 @@ class AugmentedTensorDataset(Dataset):
         return len(self.X)
     
     def __getitem__(self, idx):
-        img = self.X[idx]  # (32, 32, 3) uint8
+        img = self.X[idx]  # (32, 32, 3) uint8 numpy array
         label = int(self.y[idx])
         
-        # Apply transforms (expects PIL or numpy HWC uint8)
+        # Convert numpy array to PIL Image (required by torchvision transforms)
+        img = Image.fromarray(img)
+        
+        # Apply transforms
         if self.transform:
             img = self.transform(img)
         else:
             # Default: just convert to tensor and normalize
-            img = torch.from_numpy(img).permute(2, 0, 1).float() / 255.0
+            img = transforms.ToTensor()(img)
         
         return img, label
 
