@@ -55,14 +55,38 @@ def set_seed(seed: int = 42):
 
 
 def get_device():
-    """Get the best available device."""
+    """Get the best available device with detailed GPU information."""
     if torch.cuda.is_available():
         device = torch.device('cuda')
-        print(f"Using CUDA: {torch.cuda.get_device_name(0)}")
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
+        print(f"\n{'='*70}")
+        print(f"🚀 GPU DETECTED AND ENABLED")
+        print(f"{'='*70}")
+        print(f"   Device: {gpu_name}")
+        print(f"   Total Memory: {gpu_memory:.2f} GB")
+        print(f"   CUDA Version: {torch.version.cuda}")
+        print(f"   cuDNN Enabled: {torch.backends.cudnn.enabled}")
+        print(f"   Number of GPUs: {torch.cuda.device_count()}")
+        print(f"{'='*70}\n")
     else:
         device = torch.device('cpu')
-        print("Using CPU")
+        print(f"\n{'='*70}")
+        print(f"⚠️  WARNING: GPU NOT AVAILABLE")
+        print(f"{'='*70}")
+        print("   Running on CPU - Training will be significantly slower!")
+        print("   For Google Colab: Runtime > Change runtime type > GPU")
+        print(f"{'='*70}\n")
     return device
+
+
+def print_gpu_memory_usage():
+    """Print current GPU memory usage."""
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated(0) / 1024**3  # GB
+        reserved = torch.cuda.memory_reserved(0) / 1024**3  # GB
+        return f"GPU Memory: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved"
+    return "CPU mode"
 
 
 # ============================================================================
@@ -559,9 +583,19 @@ def run_epoch(model, loader, criterion, optimizer, device,
     correct = 0
     total = 0
     
+    # Verify GPU usage on first batch (one-time check)
+    first_batch = True
+    
     with torch.set_grad_enabled(is_training):
         for X, y in loader:
             X, y = X.to(device), y.to(device)
+            
+            # One-time GPU verification
+            if first_batch and is_training:
+                if torch.cuda.is_available():
+                    assert X.is_cuda, "ERROR: Data not on GPU!"
+                    assert next(model.parameters()).is_cuda, "ERROR: Model not on GPU!"
+                first_batch = False
             
             # Apply mixing augmentation if specified
             if is_training and mixing_aug == 'mixup' and mixing_alpha is not None:
@@ -730,10 +764,13 @@ def train_model(model, train_loader, val_loader, test_loader,
         
         # Periodic checkpoint logging
         if (epoch + 1) % 10 == 0 or epoch + 1 == num_epochs:
-            print(f"   └─ [Checkpoint] Best Val: {best_val_acc:.4f} at epoch {best_epoch}")
+            gpu_info = f" | {print_gpu_memory_usage()}" if torch.cuda.is_available() else ""
+            print(f"   └─ [Checkpoint] Best Val: {best_val_acc:.4f} at epoch {best_epoch}{gpu_info}")
     
     print(f"\n✅ Training complete!")
     print(f"   Best validation accuracy: {best_val_acc:.4f} (epoch {best_epoch})")
+    if torch.cuda.is_available():
+        print(f"   Peak GPU Memory: {torch.cuda.max_memory_allocated(0) / 1024**3:.2f} GB")
     
     # Save model checkpoint
     checkpoint_path = os.path.join(Config.RESULTS_DIR, f'{exp_name}_model.pth')
@@ -800,25 +837,29 @@ def run_single_experiment(X_train, y_train, X_val, y_val, X_test, y_test,
     val_dataset = AugmentedTensorDataset(X_val, y_val, transform=test_transform)
     test_dataset = AugmentedTensorDataset(X_test, y_test, transform=test_transform)
     
-    # Create loaders
+    # Create loaders (pin_memory for faster GPU transfer)
+    pin_mem = torch.cuda.is_available()
     train_loader = DataLoader(train_dataset, batch_size=Config.BATCH_SIZE, 
-                              shuffle=True, num_workers=0, pin_memory=True)
+                              shuffle=True, num_workers=0, pin_memory=pin_mem)
     val_loader = DataLoader(val_dataset, batch_size=Config.BATCH_SIZE, 
-                           shuffle=False, num_workers=0, pin_memory=True)
+                           shuffle=False, num_workers=0, pin_memory=pin_mem)
     test_loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE,
-                            shuffle=False, num_workers=0, pin_memory=True)
+                            shuffle=False, num_workers=0, pin_memory=pin_mem)
     
     # Create clean train loader if needed
     train_clean_loader = None
     if evaluate_clean_train:
         train_clean_dataset = AugmentedTensorDataset(X_train, y_train, transform=test_transform)
         train_clean_loader = DataLoader(train_clean_dataset, batch_size=Config.BATCH_SIZE,
-                                       shuffle=False, num_workers=0, pin_memory=True)
+                                       shuffle=False, num_workers=0, pin_memory=pin_mem)
     
     # Create model
     model = MiniVGG(num_classes=Config.NUM_CLASSES, dropout=dropout).to(device)
     num_params = count_parameters(model)
     print(f"   Model parameters: {num_params:,}")
+    print(f"   Device: {next(model.parameters()).device}")
+    if torch.cuda.is_available():
+        print(f"   {print_gpu_memory_usage()}")
     
     # Train
     run_start = time.time()
@@ -1098,6 +1139,14 @@ def main():
     
     # Setup
     device = get_device()
+    
+    # Verify GPU usage
+    if not torch.cuda.is_available():
+        response = input("\n⚠️  No GPU detected. Training will be very slow. Continue? (y/n): ")
+        if response.lower() != 'y':
+            print("Aborted. Please enable GPU and try again.")
+            return
+    
     os.makedirs(Config.RESULTS_DIR, exist_ok=True)
     
     # Load data
@@ -1388,6 +1437,11 @@ def main():
     print("✓ All experiments complete!")
     print(f"✓ Results saved to: {Config.RESULTS_DIR}")
     print(f"✓ Model checkpoints: {len(Config.SEEDS) * 5} models saved")
+    if torch.cuda.is_available():
+        print(f"✓ GPU Training Complete: {torch.cuda.get_device_name(0)}")
+        print(f"✓ Total GPU Memory Used: {torch.cuda.max_memory_allocated(0) / 1024**3:.2f} GB")
+    else:
+        print("✓ CPU Training Complete")
     print("="*70)
 
 
