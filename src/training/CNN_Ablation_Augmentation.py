@@ -259,11 +259,11 @@ class RandomErasing(nn.Module):
         C, H, W = img.shape
         area = H * W
         
-        log_ratio = torch.log(torch.tensor(self.ratio))
-        aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0], log_ratio[1]))
+        log_ratio = torch.log(torch.as_tensor(self.ratio))
+        aspect_ratio = torch.exp(torch.empty(1).uniform_(log_ratio[0].item(), log_ratio[1].item()))
         
-        w = int(torch.sqrt(torch.tensor(area / aspect_ratio)).item())
-        h = int(torch.sqrt(torch.tensor(area * aspect_ratio)).item())
+        w = int(torch.sqrt(area / aspect_ratio).item())
+        h = int(torch.sqrt(area * aspect_ratio).item())
         
         w = min(w, W)
         h = min(h, H)
@@ -738,7 +738,8 @@ def main():
                 label = self.y[idx]
                 
                 if self.transform:
-                    img = transforms.ToPILImage()(img.numpy().astype(np.uint8))
+                    # img is already a numpy array (uint8 HWC format)
+                    img = transforms.ToPILImage()(img)
                     img = self.transform(img)
                 
                 return img, label
