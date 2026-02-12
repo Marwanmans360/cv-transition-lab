@@ -1143,14 +1143,6 @@ def main():
     
     # Setup
     device = get_device()
-    
-    # Verify GPU usage
-    if not torch.cuda.is_available():
-        response = input("\n⚠️  No GPU detected. Training will be very slow. Continue? (y/n): ")
-        if response.lower() != 'y':
-            print("Aborted. Please enable GPU and try again.")
-            return
-    
     os.makedirs(Config.RESULTS_DIR, exist_ok=True)
     
     # Load data
