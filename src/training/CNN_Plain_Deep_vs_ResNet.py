@@ -804,7 +804,7 @@ def main():
     device = get_device()
     
     # Configuration
-    CIFAR10_PATH = 'data/cifar-10-batches-py'
+    CIFAR10_PATH = os.environ.get('CIFAR10_PATH', 'data/cifar-10-batches-py')
     RESULTS_DIR = 'results/plain_vs_resnet'
     os.makedirs(RESULTS_DIR, exist_ok=True)
     
@@ -830,6 +830,11 @@ def main():
     
     # Load CIFAR-10
     print("📦 Loading CIFAR-10 dataset...")
+    if not os.path.exists(CIFAR10_PATH):
+        raise FileNotFoundError(
+            f"CIFAR-10 path not found: {CIFAR10_PATH}. "
+            "Set CIFAR10_PATH or update the path in the script."
+        )
     (X_train_flat, y_train), (X_test_flat, y_test) = load_cifar10_from_folder(CIFAR10_PATH)
     X_train_hwc = cifar10_flat_to_hwc_uint8(X_train_flat)
     X_test_hwc = cifar10_flat_to_hwc_uint8(X_test_flat)
