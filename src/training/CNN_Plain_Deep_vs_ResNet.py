@@ -1,15 +1,22 @@
 """
-Plain Deep CNN vs ResNet Comparison
-====================================
+Plain Deep CNN vs ResNet Comparison (34-Layer Networks)
+=========================================================
 
 Systematic comparison of plain deep CNNs vs ResNets on CIFAR-10.
+This experiment demonstrates the DEGRADATION PROBLEM and ResNet's solution.
 
 Key Experiments:
-1. Plain Deep CNN (16 conv layers, no residuals)
-   - Expected: harder optimization, slower convergence, potentially worse accuracy
+1. Plain Deep CNN-34 (32 conv layers, no residuals)
+   - Expected: SEVERE optimization difficulties (vanishing gradients)
+   - May have HIGHER training error than shallower networks
+   - This is the degradation problem!
    
-2. ResNet with skip connections (same depth)
-   - Expected: faster convergence, better final accuracy, more stable training
+2. ResNet-34 (32 conv layers, WITH skip connections)
+   - Expected: No degradation, smooth convergence
+   - Skip connections enable gradient flow
+   - Can go even deeper (50, 101, 152+ layers)
+
+AT 34 LAYERS: This is where ResNets truly outperform plain networks!
 
 Using best augmentation strategy: crop_flip (RandomCrop + RandomHorizontalFlip)
 Using same hyperparameters: lr=0.01, momentum=0.9, weight_decay=1e-4
@@ -239,16 +246,24 @@ class BasicBlock(nn.Module):
 # LESSON 2: ResNet Architecture (Same Depth as Plain CNN)
 # ============================================================================
 
-class ResNet16(nn.Module):
+class ResNet34(nn.Module):
     """
-    ResNet with 16 convolutional layers (same as PlainDeepCNN for fair comparison)
+    ResNet-34 with 34 convolutional layers (same as PlainDeepCNN34 for fair comparison)
     
     ARCHITECTURE DESIGN:
     --------------------
     - Uses BasicBlock (2 convs per block)
-    - 4 stages, 2 blocks per stage → 2 * 2 * 4 = 16 conv layers
+    - 4 stages with [3, 4, 6, 3] blocks → 2 * (3+4+6+3) = 32 conv layers in blocks + 2 in conv1/fc
+    - Configuration matches standard ResNet-34
     - Each stage doubles channels and halves spatial size
     - Skip connections in every BasicBlock
+    
+    WHY DEPTH MATTERS:
+    ------------------
+    At 34 layers, this is where ResNets show their true power:
+    - Plain networks suffer from degradation problem
+    - ResNets maintain trainability and performance
+    - Skip connections allow gradients to flow freely
     
     COMPARISON WITH PLAIN CNN:
     --------------------------
@@ -259,36 +274,37 @@ class ResNet16(nn.Module):
     """
     
     def __init__(self, num_classes=10):
-        super(ResNet16, self).__init__()
+        super(ResNet34, self).__init__()
         
-        # Initial conv layer (not counted in the 16)
+        # Initial conv layer (not counted in the 34)
         # This matches common ResNet designs
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
         
         # Stage 1: 16 channels, 32x32 spatial size
-        # 2 BasicBlocks = 4 conv layers
-        self.stage1 = self._make_stage(16, 16, num_blocks=2, stride=1)
+        # 3 BasicBlocks = 6 conv layers
+        self.stage1 = self._make_stage(16, 16, num_blocks=3, stride=1)
         
         # Stage 2: 32 channels, 16x16 spatial size
-        # 2 BasicBlocks = 4 conv layers
-        self.stage2 = self._make_stage(16, 32, num_blocks=2, stride=2)
+        # 4 BasicBlocks = 8 conv layers
+        self.stage2 = self._make_stage(16, 32, num_blocks=4, stride=2)
         
         # Stage 3: 64 channels, 8x8 spatial size
-        # 2 BasicBlocks = 4 conv layers
-        self.stage3 = self._make_stage(32, 64, num_blocks=2, stride=2)
+        # 6 BasicBlocks = 12 conv layers
+        self.stage3 = self._make_stage(32, 64, num_blocks=6, stride=2)
         
         # Stage 4: 128 channels, 4x4 spatial size
-        # 2 BasicBlocks = 4 conv layers
-        self.stage4 = self._make_stage(64, 128, num_blocks=2, stride=2)
+        # 3 BasicBlocks = 6 conv layers
+        self.stage4 = self._make_stage(64, 128, num_blocks=3, stride=2)
         
         # Global average pooling + classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(128, num_classes)
         
-        # Total: 16 conv layers in residual blocks (same as PlainDeepCNN)
-        self.total_conv_layers = 16
+        # Total: 32 conv layers in residual blocks (3+4+6+3)*2 = 32
+        # Plus 1 initial conv = 33, plus fc layer ≈ 34 layer network
+        self.total_conv_layers = 32
     
     def _make_stage(self, in_channels, out_channels, num_blocks, stride):
         """
@@ -345,38 +361,46 @@ class ResNet16(nn.Module):
 # Plain Deep CNN Architecture (No Residuals)
 # ============================================================================
 
-class PlainDeepCNN(nn.Module):
+class PlainDeepCNN34(nn.Module):
     """
-    Plain Deep CNN with 16 convolutional layers (no skip connections).
+    Plain Deep CNN with 32 convolutional layers (no skip connections).
     
     Architecture:
-    - 16 conv layers (3x3 kernel) organized in 4 stages
-    - Each stage has 4 conv layers with same channel count
+    - 32 conv layers (3x3 kernel) organized in 4 stages
+    - Stages have [6, 8, 12, 6] layers matching ResNet-34 depth
     - Downsampling via stride=2 between stages
     - BatchNorm + ReLU after each conv
-    - Expected to suffer from optimization difficulties
+    - Expected to suffer SEVERELY from degradation problem at this depth
+    
+    DEGRADATION HYPOTHESIS:
+    ------------------------
+    At 32+ layers without skip connections:
+    - Gradients vanish during backpropagation
+    - Training error may be HIGHER than shallower networks
+    - Worse performance despite more capacity
+    - This is what ResNets were designed to solve!
     """
     def __init__(self, num_classes=10):
-        super(PlainDeepCNN, self).__init__()
+        super(PlainDeepCNN34, self).__init__()
         
-        # Stage 1: 16 channels, 32x32 spatial size
-        self.stage1 = self._make_plain_stage(3, 16, num_layers=4, first_stride=1)
+        # Stage 1: 16 channels, 32x32 spatial size (6 layers)
+        self.stage1 = self._make_plain_stage(3, 16, num_layers=6, first_stride=1)
         
-        # Stage 2: 32 channels, 16x16 spatial size
-        self.stage2 = self._make_plain_stage(16, 32, num_layers=4, first_stride=2)
+        # Stage 2: 32 channels, 16x16 spatial size (8 layers)
+        self.stage2 = self._make_plain_stage(16, 32, num_layers=8, first_stride=2)
         
-        # Stage 3: 64 channels, 8x8 spatial size
-        self.stage3 = self._make_plain_stage(32, 64, num_layers=4, first_stride=2)
+        # Stage 3: 64 channels, 8x8 spatial size (12 layers)
+        self.stage3 = self._make_plain_stage(32, 64, num_layers=12, first_stride=2)
         
-        # Stage 4: 128 channels, 4x4 spatial size
-        self.stage4 = self._make_plain_stage(64, 128, num_layers=4, first_stride=2)
+        # Stage 4: 128 channels, 4x4 spatial size (6 layers)
+        self.stage4 = self._make_plain_stage(64, 128, num_layers=6, first_stride=2)
         
         # Global average pooling + classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(128, num_classes)
         
-        # Count total conv layers
-        self.total_conv_layers = 16
+        # Count total conv layers: 6 + 8 + 12 + 6 = 32
+        self.total_conv_layers = 32
         
     def _make_plain_stage(self, in_channels, out_channels, num_layers, first_stride):
         """Create a plain stage with multiple conv-bn-relu layers."""
@@ -789,10 +813,10 @@ def print_residual_math_explanation():
 # ============================================================================
 
 def main():
-    """Run the Plain Deep CNN vs ResNet comparison experiment."""
+    """Run the Plain Deep CNN-34 vs ResNet-34 comparison experiment."""
     
     print("\n" + "="*70)
-    print("PLAIN DEEP CNN vs RESNET COMPARISON")
+    print("PLAIN DEEP CNN-34 vs RESNET-34 COMPARISON (32-LAYER NETWORKS)")
     print("="*70 + "\n")
     
     # Educational explanations
@@ -805,7 +829,7 @@ def main():
     
     # Configuration
     CIFAR10_PATH = os.environ.get('CIFAR10_PATH', 'data/cifar-10-batches-py')
-    RESULTS_DIR = 'results/plain_vs_resnet'
+    RESULTS_DIR = 'results/plain34_vs_resnet34'
     os.makedirs(RESULTS_DIR, exist_ok=True)
     
     # Training configuration (same as best augmentation experiment)
@@ -883,22 +907,23 @@ def main():
                            shuffle=False, num_workers=2)
     
     # ========================================================================
-    # Experiment 1: Plain Deep CNN (16 layers, no residuals)
+    # Experiment 1: Plain Deep CNN (32 layers, no residuals)
     # ========================================================================
     
     print("\n" + "="*70)
-    print("EXPERIMENT 1: PLAIN DEEP CNN (16 conv layers, NO residuals)")
+    print("EXPERIMENT 1: PLAIN DEEP CNN-34 (32 conv layers, NO residuals)")
     print("="*70 + "\n")
     
-    print("📚 THEORY: Plain Deep Networks")
+    print("📚 THEORY: Plain Deep Networks at 32+ Layers")
     print("-" * 70)
-    print("As we stack more layers, we expect:")
-    print("  ✗ Optimization becomes harder (vanishing gradients)")
-    print("  ✗ Training loss may not decrease smoothly")
-    print("  ✗ May underperform shallower networks (degradation problem)")
+    print("At this depth, we expect SEVERE degradation problem:")
+    print("  ✗ Optimization becomes very difficult (vanishing gradients)")
+    print("  ✗ Training error may be HIGHER than shallower networks")
+    print("  ✗ May fail to learn even simple patterns")
+    print("  ✗ This is exactly what ResNets were designed to solve!")
     print("-" * 70 + "\n")
     
-    model_plain = PlainDeepCNN(num_classes=10).to(device)
+    model_plain = PlainDeepCNN34(num_classes=10).to(device)
     initialize_weights(model_plain)
     
     # Count parameters
@@ -915,33 +940,34 @@ def main():
     out = model_plain(dummy)
     print(f"   Output shape: {tuple(out.shape)} ✓\n")
     
-    # Train Plain Deep CNN
-    config['name'] = 'Plain Deep CNN'
+    # Train Plain Deep CNN-34
+    config['name'] = 'Plain Deep CNN-34'
     history_plain = train_model(model_plain, train_loader, val_loader, config, device)
 
     # Save plain CNN weights
-    plain_weights_path = os.path.join(RESULTS_DIR, 'plain_cnn.pth')
+    plain_weights_path = os.path.join(RESULTS_DIR, 'plain_cnn34.pth')
     torch.save(model_plain.state_dict(), plain_weights_path)
     print(f"💾 Saved plain CNN weights to {plain_weights_path}\n")
     
     # ========================================================================
-    # Experiment 2: ResNet-16 (16 layers, WITH residuals)
+    # Experiment 2: ResNet-34 (32 layers, WITH residuals)
     # ========================================================================
     
     print("\n" + "="*70)
-    print("EXPERIMENT 2: RESNET-16 (16 conv layers, WITH residuals)")
+    print("EXPERIMENT 2: RESNET-34 (32 conv layers, WITH residuals)")
     print("="*70 + "\n")
     
-    print("📚 THEORY: Residual Learning")
+    print("📚 THEORY: Residual Learning at Scale")
     print("-" * 70)
-    print("With skip connections (y = F(x) + x):")
-    print("  ✓ Gradients flow directly through shortcuts")
-    print("  ✓ Easier to optimize (learning residual F(x) vs full mapping)")
-    print("  ✓ No degradation - can at least learn identity")
-    print("  ✓ Training loss should decrease more smoothly")
+    print("With skip connections at 32+ layers (y = F(x) + x):")
+    print("  ✓ Gradients flow directly through shortcuts (no vanishing)")
+    print("  ✓ Learning residual F(x) is easier than full mapping H(x)")
+    print("  ✓ Can ALWAYS learn identity (worst case: F(x)=0)")
+    print("  ✓ No degradation - deeper is better!")
+    print("  ✓ This is where ResNets truly shine vs plain networks")
     print("-" * 70 + "\n")
     
-    model_resnet = ResNet16(num_classes=10).to(device)
+    model_resnet = ResNet34(num_classes=10).to(device)
     initialize_weights(model_resnet)
     
     # Count parameters
@@ -977,20 +1003,20 @@ def main():
     
     # Combine results
     results = {
-        'Plain Deep CNN': history_plain,
-        'ResNet': history_resnet
+        'Plain Deep CNN-34': history_plain,
+        'ResNet-34': history_resnet
     }
     
     # Plot comparison
     plot_training_comparison(results, 
-                            save_path=os.path.join(RESULTS_DIR, 'plain_vs_resnet_comparison.png'))
+                            save_path=os.path.join(RESULTS_DIR, 'plain_vs_resnet34_comparison.png'))
     
     # Print summary
     print_summary_table(results)
     
     # Additional analysis
     print("\n📊 DETAILED COMPARISON:\n")
-    print(f"{'Metric':<30} | {'Plain CNN':<15} | {'ResNet-16':<15} | {'Winner':<10}")
+    print(f"{'Metric':<30} | {'Plain CNN-34':<15} | {'ResNet-34':<15} | {'Winner':<10}")
     print("-" * 75)
     
     best_val_plain = max(history_plain['val_acc'])
@@ -1028,32 +1054,33 @@ def main():
     # Key observations
     print("🔍 KEY OBSERVATIONS:\n")
     print("1. Training Loss Convergence:")
-    print("   - Plain CNN: Training may be unstable, loss may plateau")
-    print("   - ResNet: Smoother convergence, more reliable optimization\n")
+    print("   - Plain CNN-34: Likely STRUGGLES, may not converge well")
+    print("   - ResNet-34: Smooth convergence, reliable optimization\n")
     
     print("2. Validation Accuracy:")
     if best_val_resnet > best_val_plain:
         improvement = (best_val_resnet - best_val_plain) * 100
-        print(f"   - ResNet achieves {improvement:.2f}% higher accuracy")
-        print("   - Skip connections enable better generalization\n")
+        print(f"   - ResNet-34 achieves {improvement:.2f}% higher accuracy")
+        print("   - This demonstrates ResNet's advantage at depth!\n")
     else:
-        print("   - Comparable performance (both architectures work)\n")
+        print("   - If Plain CNN-34 wins, depth may still be too shallow\n")
     
-    print("3. Optimization Stability:")
-    print("   - ResNet should show more stable training curves")
-    print("   - Plain CNN may show more variance in validation accuracy\n")
+    print("3. The Degradation Problem (KEY INSIGHT):")
+    print("   - Plain-34 may have HIGHER training error than Plain-16")
+    print("   - ResNet-34 should outperform or match ResNet-16")
+    print("   - This is the degradation problem ResNets solve!\n")
     
-    print("4. What Skip Connections Changed:")
-    print("   ✓ Gradient Flow: Direct paths avoid vanishing gradients")
-    print("   ✓ Optimization: Easier to learn residuals F(x) than full H(x)")
-    print("   ✓ Stability: Training is more reliable and predictable")
-    print("   ✓ Depth: Can go deeper without degradation\n")
+    print("4. What Skip Connections Changed at This Depth:")
+    print("   ✓ Gradient Flow: Direct paths prevent vanishing gradients")
+    print("   ✓ Optimization: Learning residuals F(x) is much easier")
+    print("   ✓ Identity Mapping: Worst case F(x)=0 gives identity")
+    print("   ✓ Enables Depth: Can go 50, 101, even 1000 layers!\n")
     
     # Save all results
     results_file = os.path.join(RESULTS_DIR, 'comparison_results.json')
     comparison_data = {
-        'plain_cnn': history_plain,
-        'resnet': history_resnet,
+        'plain_cnn34': history_plain,
+        'resnet34': history_resnet,
         'summary': {
             'plain_best_val': float(best_val_plain),
             'resnet_best_val': float(best_val_resnet),
