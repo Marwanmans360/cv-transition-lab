@@ -686,7 +686,7 @@ def print_summary_table(results):
 
 
 # ============================================================================
-# Educational Visualization
+# Visualization
 # ============================================================================
 
 def print_architecture_comparison():
@@ -913,6 +913,11 @@ def main():
     # Train Plain Deep CNN
     config['name'] = 'Plain Deep CNN'
     history_plain = train_model(model_plain, train_loader, val_loader, config, device)
+
+    # Save plain CNN weights
+    plain_weights_path = os.path.join(RESULTS_DIR, 'plain_cnn.pth')
+    torch.save(model_plain.state_dict(), plain_weights_path)
+    print(f"💾 Saved plain CNN weights to {plain_weights_path}\n")
     
     # ========================================================================
     # Experiment 2: ResNet-16 (16 layers, WITH residuals)
@@ -951,6 +956,11 @@ def main():
     # Train ResNet
     config['name'] = 'ResNet-16'
     history_resnet = train_model(model_resnet, train_loader, val_loader, config, device)
+
+    # Save ResNet weights
+    resnet_weights_path = os.path.join(RESULTS_DIR, 'resnet16.pth')
+    torch.save(model_resnet.state_dict(), resnet_weights_path)
+    print(f"💾 Saved ResNet weights to {resnet_weights_path}\n")
     
     # ========================================================================
     # Comparison Analysis
