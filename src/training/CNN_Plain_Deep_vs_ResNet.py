@@ -605,8 +605,21 @@ def plot_training_comparison(results, save_path=None):
     """
     fig, axes = plt.subplots(2, 2, figsize=(15, 11))
     
-    colors = {'Plain Deep CNN': '#e74c3c', 'ResNet': '#27ae60', 'ResNet-16': '#27ae60'}
-    markers = {'Plain Deep CNN': 'o', 'ResNet': 's', 'ResNet-16': 's'}
+    # Color scheme: Red for Plain networks, Green for ResNets
+    colors = {
+        'Plain Deep CNN': '#e74c3c',      # Red
+        'Plain Deep CNN-34': '#e74c3c',   # Red
+        'ResNet': '#27ae60',               # Green
+        'ResNet-16': '#27ae60',            # Green
+        'ResNet-34': '#27ae60'             # Green
+    }
+    markers = {
+        'Plain Deep CNN': 'o',
+        'Plain Deep CNN-34': 'o',
+        'ResNet': 's',
+        'ResNet-16': 's',
+        'ResNet-34': 's'
+    }
     
     # Plot 1: Training Loss - Shows optimization difficulty
     ax = axes[0, 0]
